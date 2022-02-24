@@ -1,0 +1,84 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: fedora
+  labels:
+    app: fedora
+spec:
+  dataVolumeTemplates:
+    - metadata:
+        name: fedora-rootdisk
+      spec:
+        pvc:
+          accessModes:
+            - ReadWriteMany
+          storageClassName: csi-lvm
+          resources:
+            requests:
+              storage: 5Gi
+          volumeMode: Block
+        source:
+          http:
+            url: >-
+              https://mirror.csclub.uwaterloo.ca/fedora/linux/releases/35/Cloud/x86_64/images/Fedora-Cloud-Base-35-1.2.x86_64.qcow2
+
+  running: true
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        kubevirt.io/domain: fedora
+        vm.kubevirt.io/name: fedora
+    spec:
+      domain:
+        cpu:
+          cores: 2
+          sockets: 1
+          threads: 2
+        devices:
+          autoattachPodInterface: false
+          disks:
+            - bootOrder: 1
+              disk:
+                bus: virtio
+              name: rootdisk
+            - bootOrder: 3
+              disk:
+                bus: virtio
+              name: cloudinitdisk
+          interfaces:
+            - masquerade: {}
+              macAddress: "52:54:19:88:01:01"
+              model: virtio
+              name: nic-0
+
+          networkInterfaceMultiqueue: true
+          rng: {}
+        machine:
+          type: pc-q35-rhel8.2.0
+        resources:
+          requests:
+            memory: 6Gi
+
+      evictionStrategy: LiveMigrate
+      hostname: fedora
+      networks:
+        - pod: {}
+          name: nic-0
+
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - dataVolume:
+            name: fedora-rootdisk
+          name: rootdisk
+
+        - cloudInitNoCloud:
+            userData: |-
+              #cloud-config
+              chpasswd:
+                list: |
+                  fedora:redhat11
+                expire: False
+              password: redhat11
+              hostname: fedora
+          name: cloudinitdisk
